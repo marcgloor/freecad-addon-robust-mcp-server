@@ -108,6 +108,7 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[None]:
             freecad_path=str(config.freecad_path) if config.freecad_path else None,
         )
         logger.info("Using embedded bridge (headless mode)")
+        await _bridge.connect()
 
     elif config.mode == FreecadMode.XMLRPC:
         from freecad_mcp.bridge.xmlrpc import XmlRpcBridge
@@ -119,8 +120,9 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[None]:
         logger.info(
             "Using XML-RPC bridge: %s:%d", config.socket_host, config.xmlrpc_port
         )
+        await _bridge.connect()
 
-    else:  # SOCKET mode
+    elif config.mode == FreecadMode.SOCKET:
         from freecad_mcp.bridge.socket import SocketBridge
 
         _bridge = SocketBridge(
@@ -130,8 +132,31 @@ async def lifespan(_server: FastMCP) -> AsyncIterator[None]:
         logger.info(
             "Using socket bridge: %s:%d", config.socket_host, config.socket_port
         )
+        await _bridge.connect()
 
-    await _bridge.connect()
+    else:  # AUTO mode: prefer socket, fallback to XML-RPC
+        from freecad_mcp.bridge.socket import SocketBridge
+        from freecad_mcp.bridge.xmlrpc import XmlRpcBridge
+
+        socket_bridge = SocketBridge(host=config.socket_host, port=config.socket_port)
+        try:
+            await socket_bridge.connect()
+            _bridge = socket_bridge
+            logger.info(
+                "AUTO mode selected socket bridge: %s:%d",
+                config.socket_host,
+                config.socket_port,
+            )
+        except Exception as socket_error:
+            logger.warning("AUTO mode socket connect failed: %s", socket_error)
+            xmlrpc_bridge = XmlRpcBridge(host=config.socket_host, port=config.xmlrpc_port)
+            await xmlrpc_bridge.connect()
+            _bridge = xmlrpc_bridge
+            logger.info(
+                "AUTO mode selected XML-RPC bridge fallback: %s:%d",
+                config.socket_host,
+                config.xmlrpc_port,
+            )
     logger.info("FreeCAD bridge connected")
 
     # Log FreeCAD version
@@ -190,7 +215,7 @@ async def check_freecad_connection(
     """Test FreeCAD bridge connection.
 
     Args:
-        mode: Connection mode override (xmlrpc, socket, embedded).
+        mode: Connection mode override (auto, xmlrpc, socket, embedded).
         host: Host override for connection.
         port: Port override for connection.
 
@@ -205,7 +230,7 @@ async def check_freecad_connection(
     if host:
         os.environ["FREECAD_SOCKET_HOST"] = host
     if port:
-        mode_val = mode or os.environ.get("FREECAD_MODE", "xmlrpc")
+        mode_val = mode or os.environ.get("FREECAD_MODE", "auto")
         if mode_val == "xmlrpc":
             os.environ["FREECAD_XMLRPC_PORT"] = str(port)
         else:
@@ -272,7 +297,7 @@ def apply_cli_args_to_env(args: argparse.Namespace) -> None:
         os.environ["FREECAD_SOCKET_HOST"] = args.host
     if args.port:
         # Set appropriate port based on mode
-        mode = os.environ.get("FREECAD_MODE", "xmlrpc")
+        mode = os.environ.get("FREECAD_MODE", "auto")
         if mode == "xmlrpc":
             os.environ["FREECAD_XMLRPC_PORT"] = str(args.port)
         else:

@@ -85,7 +85,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 ## Features
 
 - **150+ MCP Tools**: Comprehensive CAD operations including primitives, PartDesign, booleans, export
-- **Multiple Connection Modes**: XML-RPC (recommended), JSON-RPC socket, or embedded
+- **Multiple Connection Modes**: AUTO mode (socket-first), XML-RPC, JSON-RPC socket, or embedded
 - **GUI & Headless Support**: Full modeling in headless mode, plus screenshots/colors in GUI mode
 - **Macro Development**: Create, edit, run, and template FreeCAD macros via MCP
 
@@ -177,7 +177,7 @@ just docker::build-multi  # Build multi-arch (amd64 + arm64)
 
 | Variable              | Description                                          | Default     |
 | --------------------- | ---------------------------------------------------- | ----------- |
-| `FREECAD_MODE`        | Connection mode: `xmlrpc`, `socket`, or `embedded`   | `xmlrpc`    |
+| `FREECAD_MODE`        | Connection mode: `auto`, `xmlrpc`, `socket`, or `embedded`   | `auto`    |
 | `FREECAD_PATH`        | Path to FreeCAD's lib directory (embedded mode only) | Auto-detect |
 | `FREECAD_SOCKET_HOST` | Socket/XML-RPC server hostname                       | `localhost` |
 | `FREECAD_SOCKET_PORT` | JSON-RPC socket server port                          | `9876`      |
@@ -710,3 +710,8 @@ See [docs/COMPARISON.md](docs/COMPARISON.md) for a detailed analysis of these im
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+
+### Performance roadmap commits
+
+- Phase 1 / Item 1: Added `auto` mode with socket-first selection and XML-RPC fallback; default mode is now `auto`.
