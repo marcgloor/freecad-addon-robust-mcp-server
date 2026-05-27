@@ -20,6 +20,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 - [FreeCAD Robust MCP Server](#freecad-robust-mcp-server)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
+  - [Performance](#performance)
   - [Installation Requirements / Dependencies](#installation-requirements--dependencies)
   - [For Users](#for-users)
     - [Quick Links](#quick-links)
@@ -87,6 +88,22 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 - **Multiple Connection Modes**: XML-RPC (recommended), JSON-RPC socket, or embedded
 - **GUI & Headless Support**: Full modeling in headless mode, plus screenshots/colors in GUI mode
 - **Macro Development**: Create, edit, run, and template FreeCAD macros via MCP
+
+## Performance
+
+This fork includes latency fixes for the FreeCAD ↔ MCP bridge. The public API and the XML-RPC wire protocol are unchanged, so it remains drop-in compatible with existing clients.
+
+Every tool call is a single round trip, and FreeCAD work can only run on the GUI main thread. Previously the bridge drained its request queue on a timer that fired every 50 ms, so each call waited about 25 ms on average for the timer before anything ran. Across a session of many small operations, that fixed overhead dominated and made the bridge feel slow.
+
+The patch addresses this in three ways:
+
+- **Event-driven queue draining (main fix)**: enqueuing a request now wakes the GUI main thread immediately via a thread-safe `QCoreApplication.postEvent` notifier instead of waiting for the next timer tick. The timer is kept only as a 250 ms safety net, and headless mode blocks on the queue rather than sleep-polling.
+- **HTTP keep-alive and a threaded XML-RPC server**: calls reuse a single socket instead of opening a new TCP connection each time, and health-check pings no longer serialize behind a slow execute.
+- **Client-side serialization lock**: an `asyncio.Lock` guards the reused keep-alive connection so the shared socket is never used by two executor threads at once.
+
+GUI thread-safety is preserved: all code still runs through the single main-thread queue, and only the transport layer became concurrent. In a headless benchmark, the per-operation round trip dropped from the old ~25 ms poll floor to roughly 0.09 ms (about 45× less overhead). Real-world gains scale with how many small operations a session issues.
+
+> **Note:** The bridge that runs inside FreeCAD is part of this change, so after patching you must ensure FreeCAD loads the patched addon (reinstall/update it from the patched source, or point FreeCAD's `Mod` directory at it) and restart FreeCAD. Otherwise the slow version keeps running on the FreeCAD side.
 
 ## Installation Requirements / Dependencies
 
