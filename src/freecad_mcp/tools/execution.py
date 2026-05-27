@@ -27,6 +27,7 @@ def register_execution_tools(
     async def execute_python(
         code: str,
         timeout_ms: int = 30000,
+        capture_mode: str = "full",
     ) -> dict[str, Any]:
         """Execute Python code in FreeCAD's Python console context.
 
@@ -38,6 +39,7 @@ def register_execution_tools(
                 to the caller. The code has access to FreeCAD, App, FreeCADGui,
                 and Gui modules.
             timeout_ms: Maximum execution time in milliseconds. Defaults to 30000.
+            capture_mode: Output capture mode: "full", "stdout", "stderr", or "none".
 
         Returns:
             Dictionary containing execution results:
@@ -69,7 +71,7 @@ def register_execution_tools(
                 ''')
         """
         bridge = await get_bridge()
-        result = await bridge.execute_python(code, timeout_ms)
+        result = await bridge.execute_python(code, timeout_ms, capture_mode)
         return {
             "success": result.success,
             "result": result.result,

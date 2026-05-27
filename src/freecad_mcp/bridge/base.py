@@ -288,6 +288,7 @@ class FreecadBridge(ABC):
         self,
         code: str,
         timeout_ms: int = 30000,
+        capture_mode: str = "full",
     ) -> ExecutionResult:
         """Execute Python code in FreeCAD context.
 
@@ -297,6 +298,7 @@ class FreecadBridge(ABC):
         Args:
             code: Python code to execute.
             timeout_ms: Maximum execution time in milliseconds.
+            capture_mode: Output capture mode ("full", "stdout", "stderr", "none").
 
         Returns:
             ExecutionResult with success status, output, and any errors.

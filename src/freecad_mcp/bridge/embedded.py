@@ -93,12 +93,14 @@ class EmbeddedBridge(FreecadBridge):
         self,
         code: str,
         timeout_ms: int = 30000,
+        capture_mode: str = "full",
     ) -> ExecutionResult:
         """Execute Python code in FreeCAD context.
 
         Args:
             code: Python code to execute.
             timeout_ms: Maximum execution time in milliseconds.
+            capture_mode: Output capture mode ("full", "stdout", "stderr", "none").
 
         Returns:
             ExecutionResult with execution outcome.
@@ -120,7 +122,7 @@ class EmbeddedBridge(FreecadBridge):
             result = await asyncio.wait_for(
                 loop.run_in_executor(
                     self._executor,
-                    lambda: self._execute_code(code),
+                    lambda: self._execute_code(code, capture_mode),
                 ),
                 timeout=timeout_ms / 1000,
             )
@@ -137,7 +139,7 @@ class EmbeddedBridge(FreecadBridge):
 
         return result
 
-    def _execute_code(self, code: str) -> ExecutionResult:
+    def _execute_code(self, code: str, capture_mode: str = "full") -> ExecutionResult:
         """Execute code synchronously (runs in thread pool)."""
         start = time.perf_counter()
         stdout_capture = io.StringIO()
@@ -160,9 +162,21 @@ class EmbeddedBridge(FreecadBridge):
             pass
 
         try:
-            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            if capture_mode == "none":
                 compiled = compile(code, "<mcp>", "exec")
                 exec(compiled, exec_globals)  # noqa: S102
+            elif capture_mode == "stdout":
+                with redirect_stdout(stdout_capture):
+                    compiled = compile(code, "<mcp>", "exec")
+                    exec(compiled, exec_globals)  # noqa: S102
+            elif capture_mode == "stderr":
+                with redirect_stderr(stderr_capture):
+                    compiled = compile(code, "<mcp>", "exec")
+                    exec(compiled, exec_globals)  # noqa: S102
+            else:
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    compiled = compile(code, "<mcp>", "exec")
+                    exec(compiled, exec_globals)  # noqa: S102
 
             elapsed = (time.perf_counter() - start) * 1000
 

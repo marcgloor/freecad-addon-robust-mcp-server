@@ -250,12 +250,14 @@ The FreeCAD Robust MCP Bridge server is not running. To fix this:
         self,
         code: str,
         timeout_ms: int = 30000,
+        capture_mode: str = "full",
     ) -> ExecutionResult:
         """Execute Python code in FreeCAD context via XML-RPC.
 
         Args:
             code: Python code to execute.
             timeout_ms: Maximum execution time in milliseconds.
+            capture_mode: Output capture mode (currently full capture for XML-RPC).
 
         Returns:
             ExecutionResult with execution outcome.
@@ -336,7 +338,8 @@ The FreeCAD Robust MCP Bridge server is not running. To fix this:
         for item in items:
             code = str(item.get("code", ""))
             item_timeout = int(item.get("timeout_ms", timeout_ms))
-            results.append(await self.execute_python(code, timeout_ms=item_timeout))
+            item_capture = str(item.get("capture_mode", "full"))
+            results.append(await self.execute_python(code, timeout_ms=item_timeout, capture_mode=item_capture))
         return results
 
     # =========================================================================

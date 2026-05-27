@@ -737,3 +737,7 @@ Environment: local headless Python runtime, plugin execution path (`freecad_mcp_
 | `queue_roundtrip_full` (`_execute_via_queue`, `capture_mode=full`) | 0.015349 | 0.014855 | 0.016268 |
 
 Key takeaway: disabling output capture (`capture_mode=none`) is ~2.5x faster than full capture for tiny execute calls in this benchmark setup.
+
+
+## Performance Tips
+- For lowest latency command execution, use `execute_python(..., capture_mode="none")` when logs are not needed.
