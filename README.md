@@ -718,3 +718,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 - Phase 1 / Item 2: Added `batch_execute` JSON-RPC method and socket bridge API to execute multiple snippets in one RPC round trip.
 - Phase 1 / Item 3: Added LRU compile cache (`_compile_cached`) for repeated execute snippets in the FreeCAD plugin runtime.
 - Phase 2 / Item 4: Added native RPC endpoints (`get_server_status`, `list_documents_native`) to bypass generic execute for hot introspection calls.
+- Phase 2 / Item 5: Added execution `capture_mode` (`full|none|stdout|stderr`) to reduce unnecessary stdout/stderr capture overhead on socket RPC paths.

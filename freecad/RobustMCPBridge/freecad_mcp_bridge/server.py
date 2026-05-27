@@ -203,6 +203,7 @@ class ExecutionRequest:
         code: str,
         timeout_ms: int = 30000,
         request_id: str | None = None,
+        capture_mode: str = "full",
     ) -> None:
         """Initialize execution request.
 
@@ -214,6 +215,7 @@ class ExecutionRequest:
         self.code = code
         self.timeout_ms = timeout_ms
         self.request_id = request_id
+        self.capture_mode = capture_mode
         self.result: dict[str, Any] | None = None
         self.completed = threading.Event()
 
@@ -794,7 +796,7 @@ class FreecadMCPPlugin:
         behaviour.
         """
         try:
-            request.result = self._execute_code_sync(request.code)
+            request.result = self._execute_code_sync(request.code, capture_mode=request.capture_mode)
         except Exception as e:  # pragma: no cover - defensive
             request.result = {
                 "success": False,
@@ -825,6 +827,7 @@ class FreecadMCPPlugin:
         self,
         code: str,
         timeout_ms: int = 30000,
+        capture_mode: str = "full",
     ) -> dict[str, Any]:
         """Execute code via the queue system for thread safety.
 
@@ -835,7 +838,7 @@ class FreecadMCPPlugin:
         Returns:
             Execution result dictionary.
         """
-        request = ExecutionRequest(code, timeout_ms)
+        request = ExecutionRequest(code, timeout_ms, capture_mode=capture_mode)
         self._request_queue.put(request)
 
         # Wake the GUI main thread now so the request is processed immediately
@@ -880,7 +883,7 @@ class FreecadMCPPlugin:
         """Return bridge status metadata directly."""
         return self.get_status()
 
-    def _execute_code_sync(self, code: str) -> dict[str, Any]:
+    def _execute_code_sync(self, code: str, capture_mode: str = "full") -> dict[str, Any]:
         """Execute Python code synchronously (call on main thread only).
 
         Args:
@@ -904,16 +907,36 @@ class FreecadMCPPlugin:
             exec_globals["Gui"] = FreeCADGui
 
         try:
-            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            if capture_mode == "none":
                 compiled = _compile_cached(code)
                 exec(compiled, exec_globals)  # noqa: S102
+                out = ""
+                err = ""
+            elif capture_mode == "stdout":
+                with redirect_stdout(stdout_capture):
+                    compiled = _compile_cached(code)
+                    exec(compiled, exec_globals)  # noqa: S102
+                out = stdout_capture.getvalue()
+                err = ""
+            elif capture_mode == "stderr":
+                with redirect_stderr(stderr_capture):
+                    compiled = _compile_cached(code)
+                    exec(compiled, exec_globals)  # noqa: S102
+                out = ""
+                err = stderr_capture.getvalue()
+            else:
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    compiled = _compile_cached(code)
+                    exec(compiled, exec_globals)  # noqa: S102
+                out = stdout_capture.getvalue()
+                err = stderr_capture.getvalue()
 
             elapsed = (time.perf_counter() - start) * 1000
             return {
                 "success": True,
                 "result": exec_globals.get("_result_"),
-                "stdout": stdout_capture.getvalue(),
-                "stderr": stderr_capture.getvalue(),
+                "stdout": out,
+                "stderr": err,
                 "execution_time_ms": elapsed,
             }
 
@@ -1079,7 +1102,8 @@ class FreecadMCPPlugin:
                     })
                     continue
                 item_timeout = int(item.get("timeout_ms", timeout_ms))
-                batch_results.append(self._execute_via_queue(str(item["code"]), item_timeout))
+                item_capture_mode = str(item.get("capture_mode", "full"))
+                batch_results.append(self._execute_via_queue(str(item["code"]), item_timeout, item_capture_mode))
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,

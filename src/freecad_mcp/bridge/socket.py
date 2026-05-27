@@ -300,6 +300,7 @@ class SocketBridge(FreecadBridge):
         self,
         code: str,
         timeout_ms: int = 30000,
+        capture_mode: str = "full",
     ) -> ExecutionResult:
         """Execute Python code in FreeCAD context via socket.
 
@@ -314,7 +315,7 @@ class SocketBridge(FreecadBridge):
 
         try:
             result = await asyncio.wait_for(
-                self._send_request("execute", {"code": code}),
+                self._send_request("execute", {"code": code, "capture_mode": capture_mode}),
                 timeout=timeout_ms / 1000,
             )
             elapsed = (time.perf_counter() - start) * 1000
