@@ -32,6 +32,7 @@ import time
 import traceback
 import uuid
 import weakref
+from functools import lru_cache
 import xmlrpc.server
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
@@ -186,6 +187,12 @@ def _make_queue_notifier(qt_core: Any, on_wake: Any) -> Any:
             return super().event(evt)
 
     return _QueueNotifier()
+
+
+@lru_cache(maxsize=512)
+def _compile_cached(code: str) -> Any:
+    """Compile and cache repeated snippets to reduce CPU overhead."""
+    return compile(code, "<mcp>", "exec")
 
 
 class ExecutionRequest:
@@ -878,7 +885,7 @@ class FreecadMCPPlugin:
 
         try:
             with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                compiled = compile(code, "<mcp>", "exec")
+                compiled = _compile_cached(code)
                 exec(compiled, exec_globals)  # noqa: S102
 
             elapsed = (time.perf_counter() - start) * 1000

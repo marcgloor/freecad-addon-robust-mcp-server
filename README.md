@@ -716,3 +716,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - Phase 1 / Item 1: Added `auto` mode with socket-first selection and XML-RPC fallback; default mode is now `auto`.
 - Phase 1 / Item 2: Added `batch_execute` JSON-RPC method and socket bridge API to execute multiple snippets in one RPC round trip.
+- Phase 1 / Item 3: Added LRU compile cache (`_compile_cached`) for repeated execute snippets in the FreeCAD plugin runtime.
