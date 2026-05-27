@@ -1,4 +1,4 @@
-# The Hermes optimized FreeCAD MCP Server
+# The Hermes Agent Optimized FreeCAD MCP Server
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI Version](https://img.shields.io/pypi/v/freecad-robust-mcp)](https://pypi.org/project/freecad-robust-mcp/)
