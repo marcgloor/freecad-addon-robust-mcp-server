@@ -715,3 +715,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 ### Performance roadmap commits
 
 - Phase 1 / Item 1: Added `auto` mode with socket-first selection and XML-RPC fallback; default mode is now `auto`.
+- Phase 1 / Item 2: Added `batch_execute` JSON-RPC method and socket bridge API to execute multiple snippets in one RPC round trip.

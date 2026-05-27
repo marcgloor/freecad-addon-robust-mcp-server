@@ -1018,6 +1018,33 @@ class FreecadMCPPlugin:
                 "result": {"instance_id": self._instance_id},
             }
 
+        # Handle batch_execute via queue for reduced round-trip overhead
+        if method == "batch_execute":
+            code_items = params.get("items", [])
+            timeout_ms = int(params.get("timeout_ms", 30000))
+            if not isinstance(code_items, list):
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {"code": -32602, "message": "items must be a list"},
+                }
+            batch_results = []
+            for item in code_items:
+                if not isinstance(item, dict) or "code" not in item:
+                    batch_results.append({
+                        "success": False,
+                        "error_type": "ValidationError",
+                        "error_message": "each item must be an object with code",
+                    })
+                    continue
+                item_timeout = int(item.get("timeout_ms", timeout_ms))
+                batch_results.append(self._execute_via_queue(str(item["code"]), item_timeout))
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": batch_results,
+            }
+
         # Handle execute via queue
         if method == "execute":
             code = params.get("code", "")

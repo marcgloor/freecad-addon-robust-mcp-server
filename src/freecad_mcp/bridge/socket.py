@@ -261,6 +261,31 @@ class SocketBridge(FreecadBridge):
     # Code Execution
     # =========================================================================
 
+    async def batch_execute(
+        self,
+        items: list[dict[str, Any]],
+        timeout_ms: int = 30000,
+    ) -> list[dict[str, Any]]:
+        """Execute multiple code snippets in a single RPC call.
+
+        Args:
+            items: List of objects with ``code`` and optional ``timeout_ms``.
+            timeout_ms: Default timeout for each item in milliseconds.
+
+        Returns:
+            List of execution result dictionaries in input order.
+        """
+        result = await asyncio.wait_for(
+            self._send_request(
+                "batch_execute",
+                {"items": items, "timeout_ms": timeout_ms},
+            ),
+            timeout=max(timeout_ms / 1000, self._timeout),
+        )
+        if isinstance(result, list):
+            return result
+        return []
+
     async def execute_python(
         self,
         code: str,

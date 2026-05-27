@@ -316,6 +316,19 @@ The FreeCAD Robust MCP Bridge server is not running. To fix this:
                 error_type=type(e).__name__,
             )
 
+    async def batch_execute(
+        self,
+        items: list[dict[str, Any]],
+        timeout_ms: int = 30000,
+    ) -> list[ExecutionResult]:
+        """Execute multiple snippets sequentially using the existing XML-RPC execute API."""
+        results: list[ExecutionResult] = []
+        for item in items:
+            code = str(item.get("code", ""))
+            item_timeout = int(item.get("timeout_ms", timeout_ms))
+            results.append(await self.execute_python(code, timeout_ms=item_timeout))
+        return results
+
     # =========================================================================
     # Document Management
     # =========================================================================
