@@ -860,6 +860,26 @@ class FreecadMCPPlugin:
                 "execution_time_ms": timeout_ms,
             }
 
+    def _native_list_documents(self) -> list[dict[str, Any]]:
+        """Return open-document metadata directly, without code compilation."""
+        if not FREECAD_AVAILABLE:
+            return []
+        docs: list[dict[str, Any]] = []
+        for doc in FreeCAD.listDocuments().values():
+            docs.append({
+                "name": doc.Name,
+                "label": doc.Label,
+                "path": doc.FileName or None,
+                "objects": [obj.Name for obj in doc.Objects],
+                "is_modified": bool(getattr(doc, "Modified", False)),
+                "active_object": doc.ActiveObject.Name if doc.ActiveObject else None,
+            })
+        return docs
+
+    def _native_status(self) -> dict[str, Any]:
+        """Return bridge status metadata directly."""
+        return self.get_status()
+
     def _execute_code_sync(self, code: str) -> dict[str, Any]:
         """Execute Python code synchronously (call on main thread only).
 
@@ -1015,6 +1035,20 @@ class FreecadMCPPlugin:
                     "timestamp": time.time(),
                     "instance_id": self._instance_id,
                 },
+            }
+
+        if method == "get_server_status":
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": self._native_status(),
+            }
+
+        if method == "list_documents_native":
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": self._native_list_documents(),
             }
 
         # Handle get_instance_id specially (no queue needed)

@@ -257,6 +257,16 @@ class SocketBridge(FreecadBridge):
                 error=str(e),
             )
 
+    async def get_server_status_native(self) -> dict[str, Any]:
+        """Fetch plugin status via native RPC endpoint."""
+        result = await self._send_request("get_server_status")
+        return result if isinstance(result, dict) else {}
+
+    async def list_documents_native(self) -> list[dict[str, Any]]:
+        """Fetch document list via native RPC endpoint."""
+        result = await self._send_request("list_documents_native")
+        return result if isinstance(result, list) else []
+
     # =========================================================================
     # Code Execution
     # =========================================================================
