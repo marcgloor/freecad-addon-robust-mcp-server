@@ -182,7 +182,6 @@ The FreeCAD Robust MCP Bridge server is not running. To fix this:
         start = time.perf_counter()
 
         try:
-            # Try standard system.listMethods or a simple execute
             if self._proxy is None:
                 msg = "Not connected"
                 raise ConnectionError(msg)
@@ -191,7 +190,7 @@ The FreeCAD Robust MCP Bridge server is not running. To fix this:
                 await asyncio.wait_for(
                     loop.run_in_executor(
                         None,
-                        lambda: proxy.execute("_result_ = True"),
+                        proxy.ping,
                     ),
                     timeout=self._timeout,
                 )

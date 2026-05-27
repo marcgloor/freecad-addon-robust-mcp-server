@@ -12,7 +12,6 @@ Based on learnings from competitive analysis:
 import asyncio
 import contextlib
 import time
-import uuid
 from typing import Any
 
 try:
@@ -103,6 +102,7 @@ class SocketBridge(FreecadBridge):
         self._writer: asyncio.StreamWriter | None = None
         self._connected = False
         self._lock = asyncio.Lock()
+        self._request_seq = 0
 
     async def connect(self) -> None:
         """Establish connection to FreeCAD socket server.
@@ -172,7 +172,8 @@ class SocketBridge(FreecadBridge):
             raise ConnectionError(msg)
 
         # Build JSON-RPC request
-        request_id = str(uuid.uuid4())
+        self._request_seq += 1
+        request_id = self._request_seq
         request = {
             "jsonrpc": "2.0",
             "id": request_id,
