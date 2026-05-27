@@ -723,3 +723,17 @@ MIT License - see [LICENSE](LICENSE) for details.
 - Phase 3 / Item 7: Added optional `orjson` fast-path serialization for socket client/server with stdlib JSON fallback.
 - Phase 3 / Item 8: Added adaptive bounded queue draining (`MAX_QUEUE_DRAIN_PER_PASS=100`) to improve GUI responsiveness during request bursts.
 - Phase 3 / Item 9: Switched socket request IDs to monotonic integers and optimized XML-RPC client ping to call native `ping` instead of `execute`.
+
+### Microbenchmark snapshot (post-optimization)
+
+Environment: local headless Python runtime, plugin execution path (`freecad_mcp_bridge/server.py`), repeated in-process calls.
+
+| Benchmark | Mean (ms) | p50 (ms) | p95 (ms) |
+|---|---:|---:|---:|
+| `execute_none_small` (`_result_=42`, `capture_mode=none`) | 0.000849 | 0.000718 | 0.001321 |
+| `execute_full_small` (`_result_=42`, `capture_mode=full`) | 0.002138 | 0.001792 | 0.003274 |
+| `execute_none_medium_cached` (10-line snippet, cached compile) | 0.001317 | 0.001069 | 0.001979 |
+| `queue_roundtrip_none` (`_execute_via_queue`, `capture_mode=none`) | 0.014551 | 0.014575 | 0.015703 |
+| `queue_roundtrip_full` (`_execute_via_queue`, `capture_mode=full`) | 0.015349 | 0.014855 | 0.016268 |
+
+Key takeaway: disabling output capture (`capture_mode=none`) is ~2.5x faster than full capture for tiny execute calls in this benchmark setup.
