@@ -740,5 +740,6 @@ Key takeaway: disabling output capture (`capture_mode=none`) is ~2.5x faster tha
 
 
 ## Performance Tips
+- Prefer deferred recompute for multi-step builds: create/update objects with `recompute=False`, then run one final `recompute_document()`.
 - For lowest latency command execution, use `execute_python(..., capture_mode="none")` when logs are not needed.
 - Use `execute_python_batch(items=...)` to bundle multiple snippets into one bridge round trip.

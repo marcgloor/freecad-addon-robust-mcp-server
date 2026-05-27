@@ -628,6 +628,7 @@ _result_ = {{
         name: str | None = None,
         properties: dict[str, Any] | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> ObjectInfo:
         """Create a new object."""
         properties = properties or {}
@@ -643,7 +644,9 @@ for prop_name, prop_val in {properties!r}.items():
     if hasattr(obj, prop_name):
         setattr(obj, prop_name, prop_val)
 
-doc.recompute()
+if True:
+    if {recompute!r}:
+    doc.recompute()
 
 _result_ = {{
     "name": obj.Name,
@@ -683,7 +686,9 @@ for prop_name, prop_val in {properties!r}.items():
     if hasattr(obj, prop_name):
         setattr(obj, prop_name, prop_val)
 
-doc.recompute()
+if True:
+    if {recompute!r}:
+    doc.recompute()
 
 _result_ = {{
     "name": obj.Name,

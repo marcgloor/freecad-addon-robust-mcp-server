@@ -584,6 +584,7 @@ _result_ = {{
         name: str | None = None,
         properties: dict[str, Any] | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> ObjectInfo:
         """Create a new object."""
         properties = properties or {}

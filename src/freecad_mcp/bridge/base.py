@@ -421,6 +421,7 @@ class FreecadBridge(ABC):
         name: str | None = None,
         properties: dict[str, Any] | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> ObjectInfo:
         """Create a new object.
 
@@ -429,6 +430,7 @@ class FreecadBridge(ABC):
             name: Object name (auto-generated if None).
             properties: Initial property values.
             doc_name: Target document (uses active if None).
+            recompute: Whether to recompute immediately after creation.
 
         Returns:
             ObjectInfo for the created object.

@@ -94,6 +94,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
         name: str | None = None,
         properties: dict[str, Any] | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> dict[str, Any]:
         """Create a new FreeCAD object.
 
@@ -110,6 +111,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             name: Object name. Auto-generated if None.
             properties: Initial property values to set.
             doc_name: Target document. Uses active document if None.
+            recompute: Whether to recompute immediately after creation.
 
         Returns:
             Dictionary with created object information:
@@ -132,6 +134,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
         height: float = 10.0,
         name: str | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> dict[str, Any]:
         """Create a Part Box primitive.
 
@@ -141,6 +144,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             height: Box height (Z dimension). Defaults to 10.0.
             name: Object name. Auto-generated if None.
             doc_name: Target document. Uses active document if None.
+            recompute: Whether to recompute immediately after creation.
 
         Returns:
             Dictionary with created object information:
@@ -155,6 +159,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             name,
             {"Length": length, "Width": width, "Height": height},
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -170,6 +175,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
         angle: float = 360.0,
         name: str | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> dict[str, Any]:
         """Create a Part Cylinder primitive.
 
@@ -179,6 +185,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             angle: Sweep angle in degrees (for partial cylinder). Defaults to 360.
             name: Object name. Auto-generated if None.
             doc_name: Target document. Uses active document if None.
+            recompute: Whether to recompute immediately after creation.
 
         Returns:
             Dictionary with created object information:
@@ -192,6 +199,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             name,
             {"Radius": radius, "Height": height, "Angle": angle},
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -204,6 +212,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
         radius: float = 5.0,
         name: str | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> dict[str, Any]:
         """Create a Part Sphere primitive.
 
@@ -211,6 +220,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             radius: Sphere radius. Defaults to 5.0.
             name: Object name. Auto-generated if None.
             doc_name: Target document. Uses active document if None.
+            recompute: Whether to recompute immediately after creation.
 
         Returns:
             Dictionary with created object information:
@@ -224,6 +234,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             name,
             {"Radius": radius},
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -239,6 +250,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
         angle: float = 360.0,
         name: str | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> dict[str, Any]:
         """Create a Part Cone primitive.
 
@@ -249,6 +261,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             angle: Sweep angle in degrees (for partial cone). Defaults to 360.
             name: Object name. Auto-generated if None.
             doc_name: Target document. Uses active document if None.
+            recompute: Whether to recompute immediately after creation.
 
         Returns:
             Dictionary with created object information:
@@ -262,6 +275,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             name,
             {"Radius1": radius1, "Radius2": radius2, "Height": height, "Angle": angle},
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -278,6 +292,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
         angle3: float = 360.0,
         name: str | None = None,
         doc_name: str | None = None,
+        recompute: bool = True,
     ) -> dict[str, Any]:
         """Create a Part Torus (donut shape) primitive.
 
@@ -289,6 +304,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
             angle3: Rotation angle around axis. Defaults to 360.
             name: Object name. Auto-generated if None.
             doc_name: Target document. Uses active document if None.
+            recompute: Whether to recompute immediately after creation.
 
         Returns:
             Dictionary with created object information:
@@ -308,6 +324,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
                 "Angle3": angle3,
             },
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -371,6 +388,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
                 "Z2max": z2max,
             },
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -419,6 +437,7 @@ def register_object_tools(mcp: Any, get_bridge: Callable[[], Awaitable[Any]]) ->
                 "LocalCoord": 1 if left_handed else 0,
             },
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -1127,6 +1146,7 @@ except Exception:
             name,
             {"Length": length, "Width": width},
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -1170,6 +1190,7 @@ except Exception:
                 "Angle2": angle2,
             },
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -1207,6 +1228,7 @@ except Exception:
             name,
             {"Polygon": polygon_sides, "Circumradius": circumradius, "Height": height},
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
@@ -1242,6 +1264,7 @@ except Exception:
             name,
             {"Polygon": polygon_sides, "Circumradius": circumradius},
             doc_name,
+            recompute=recompute,
         )
         return {
             "name": obj.name,
