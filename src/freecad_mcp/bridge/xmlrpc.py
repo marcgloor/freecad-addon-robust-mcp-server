@@ -78,6 +78,10 @@ class XmlRpcBridge(FreecadBridge):
         # workflow are naturally sequential, so this lock costs nothing in
         # practice while guaranteeing correctness.
         self._call_lock = asyncio.Lock()
+        self._status_cache_ttl_s = 10.0
+        self._status_cache_time = 0.0
+        self._status_cache_version: dict[str, Any] | None = None
+        self._status_cache_gui: bool | None = None
 
     @property
     def _server_url(self) -> str:
@@ -215,14 +219,21 @@ The FreeCAD Robust MCP Bridge server is not running. To fix this:
 
         try:
             ping_ms = await self.ping()
-            version_info = await self.get_freecad_version()
-            gui_available = await self.is_gui_available()
+            now = time.perf_counter()
+            if (
+                self._status_cache_version is None
+                or self._status_cache_gui is None
+                or (now - self._status_cache_time) > self._status_cache_ttl_s
+            ):
+                self._status_cache_version = await self.get_freecad_version()
+                self._status_cache_gui = await self.is_gui_available()
+                self._status_cache_time = now
 
             return ConnectionStatus(
                 connected=True,
                 mode="xmlrpc",
-                freecad_version=version_info.get("version", "unknown"),
-                gui_available=gui_available,
+                freecad_version=self._status_cache_version.get("version", "unknown"),
+                gui_available=bool(self._status_cache_gui),
                 last_ping_ms=ping_ms,
             )
         except Exception as e:
