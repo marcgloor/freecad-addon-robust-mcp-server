@@ -71,6 +71,13 @@ class XmlRpcBridge(FreecadBridge):
         self._timeout = timeout
         self._proxy: xmlrpc.client.ServerProxy | None = None
         self._connected = False
+        # Serializes access to the single keep-alive proxy connection. The
+        # default asyncio executor can run blocking calls on multiple threads
+        # concurrently; an HTTP/1.1 keep-alive ServerProxy shares one socket,
+        # so concurrent use would corrupt the stream. Calls in a modeling
+        # workflow are naturally sequential, so this lock costs nothing in
+        # practice while guaranteeing correctness.
+        self._call_lock = asyncio.Lock()
 
     @property
     def _server_url(self) -> str:
@@ -176,13 +183,14 @@ The FreeCAD Robust MCP Bridge server is not running. To fix this:
                 msg = "Not connected"
                 raise ConnectionError(msg)
             proxy = self._proxy  # Local reference for lambda
-            await asyncio.wait_for(
-                loop.run_in_executor(
-                    None,
-                    lambda: proxy.execute("_result_ = True"),
-                ),
-                timeout=self._timeout,
-            )
+            async with self._call_lock:
+                await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        lambda: proxy.execute("_result_ = True"),
+                    ),
+                    timeout=self._timeout,
+                )
         except TimeoutError as e:
             msg = "Ping timed out"
             raise ConnectionError(msg) from e
@@ -257,13 +265,14 @@ The FreeCAD Robust MCP Bridge server is not running. To fix this:
         proxy = self._proxy  # Local reference for lambda
 
         try:
-            result = await asyncio.wait_for(
-                loop.run_in_executor(
-                    None,
-                    lambda: proxy.execute(code),
-                ),
-                timeout=timeout_ms / 1000,
-            )
+            async with self._call_lock:
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        lambda: proxy.execute(code),
+                    ),
+                    timeout=timeout_ms / 1000,
+                )
             elapsed = (time.perf_counter() - start) * 1000
 
             # Parse result from XML-RPC server

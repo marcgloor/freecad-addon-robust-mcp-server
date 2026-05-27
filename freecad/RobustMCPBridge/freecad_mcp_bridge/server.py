@@ -27,6 +27,7 @@ import os
 import queue
 import sys
 import threading
+import socketserver
 import time
 import traceback
 import uuid
@@ -116,9 +117,15 @@ except ImportError:
 # Default configuration
 DEFAULT_SOCKET_PORT = 9876
 DEFAULT_XMLRPC_PORT = 9875
-QUEUE_POLL_INTERVAL_MS = 50
+# Queue processing is now event-driven: a request being enqueued posts a
+# wake-up event to the GUI thread so it is drained immediately instead of
+# waiting for the next timer tick. QUEUE_POLL_INTERVAL_MS is now only a
+# safety-net fallback in case a wake-up is ever missed, so it can be large.
+QUEUE_POLL_INTERVAL_MS = 250
 STATUS_UPDATE_INTERVAL_MS = 5000  # Update status bar every 5 seconds
-HEADLESS_POLL_INTERVAL_S = 0.1  # Headless mode poll interval in seconds
+# Headless mode blocks on the queue with this timeout instead of busy-polling,
+# so it wakes the instant a request arrives while still checking _running.
+HEADLESS_POLL_INTERVAL_S = 0.25
 
 
 def _get_qt_core() -> Any:
@@ -145,6 +152,40 @@ def _get_qt_core() -> Any:
         return QtCore
 
     return None
+
+
+def _make_queue_notifier(qt_core: Any, on_wake: Any) -> Any:
+    """Build a main-thread QObject that runs ``on_wake`` when poked.
+
+    Returns an object with a thread-safe ``wake()`` method. ``wake()`` may be
+    called from any thread (e.g. the XML-RPC/socket worker threads); it posts
+    a Qt event that is delivered on the thread owning the QObject (the GUI
+    main thread), where ``on_wake`` is then invoked. This is how an enqueued
+    request drains immediately instead of waiting for the next timer tick.
+
+    ``QCoreApplication.postEvent`` is explicitly documented as thread-safe,
+    which makes this safe to call from the server worker threads.
+    """
+    wake_event_type = qt_core.QEvent.Type(qt_core.QEvent.registerEventType())
+
+    class _QueueNotifier(qt_core.QObject):
+        def __init__(self) -> None:
+            super().__init__()
+            self._on_wake = on_wake
+
+        def wake(self) -> None:
+            # Safe to call from any thread.
+            qt_core.QCoreApplication.postEvent(
+                self, qt_core.QEvent(wake_event_type)
+            )
+
+        def event(self, evt: Any) -> bool:
+            if evt.type() == wake_event_type:
+                self._on_wake()
+                return True
+            return super().event(evt)
+
+    return _QueueNotifier()
 
 
 class ExecutionRequest:
@@ -219,6 +260,7 @@ class FreecadMCPPlugin:
         # Queue-based execution for thread safety (learned from neka-nat)
         self._request_queue: queue.Queue[ExecutionRequest] = queue.Queue()
         self._timer = None
+        self._notifier = None  # GUI-thread wake-up object (event-driven drain)
         self._queue_thread: threading.Thread | None = None
         self._headless = False
 
@@ -381,6 +423,13 @@ class FreecadMCPPlugin:
                 self._timer.deleteLater()
             self._timer = None
 
+        # Tear down the GUI wake-up notifier (GUI mode only)
+        if self._notifier is not None:
+            notifier = self._notifier
+            self._notifier = None
+            with contextlib.suppress(Exception):
+                notifier.deleteLater()
+
         # Stop XML-RPC server by closing its socket directly
         # This will cause handle_request() to raise an exception and exit
         # Keep server reference until thread exits to avoid race condition
@@ -473,6 +522,15 @@ class FreecadMCPPlugin:
             if shiboken_delete is not None:
                 with contextlib.suppress(Exception):
                     shiboken_delete(timer)
+
+        # Destroy the GUI wake-up notifier the same way (immediate C++ delete
+        # to avoid the deleteLater()-during-finalization crash).
+        if self._notifier is not None:
+            notifier = self._notifier
+            self._notifier = None
+            if shiboken_delete is not None:
+                with contextlib.suppress(Exception):
+                    shiboken_delete(notifier)
 
         # Stop XML-RPC server
         if self._xmlrpc_server:
@@ -678,6 +736,11 @@ class FreecadMCPPlugin:
                     QtCore = None  # type: ignore[assignment]
 
             if QtCore is not None:
+                # Event-driven drain: a notifier on the main thread runs
+                # _process_queue the instant a request is enqueued.
+                self._notifier = _make_queue_notifier(QtCore, self._process_queue)
+                # Safety-net timer: large interval, only catches a (very
+                # unlikely) missed wake-up. Not the hot path anymore.
                 timer = QtCore.QTimer()
                 timer.timeout.connect(self._process_queue)
                 timer.start(QUEUE_POLL_INTERVAL_MS)
@@ -700,30 +763,56 @@ class FreecadMCPPlugin:
             )
 
     def _run_queue_processor_loop(self) -> None:
-        """Run queue processor in a loop for headless mode."""
+        """Run queue processor in a loop for headless mode.
+
+        Instead of waking on a fixed interval and busy-checking an empty
+        queue, this blocks on ``queue.get`` with a short timeout. It returns
+        the instant a request is enqueued (near-zero added latency) and still
+        wakes periodically to honour ``self._running`` for clean shutdown.
+        """
         while self._running:
+            try:
+                request = self._request_queue.get(timeout=HEADLESS_POLL_INTERVAL_S)
+            except queue.Empty:
+                continue
+            self._run_request(request)
+            # Drain any others that arrived in the meantime without blocking.
             self._process_queue()
-            time.sleep(QUEUE_POLL_INTERVAL_MS / 1000.0)
+
+    def _run_request(self, request: ExecutionRequest) -> None:
+        """Execute a single request and signal its completion.
+
+        Centralises the execute/result/notify/record sequence so both the
+        GUI timer path and the headless blocking path share identical
+        behaviour.
+        """
+        try:
+            request.result = self._execute_code_sync(request.code)
+        except Exception as e:  # pragma: no cover - defensive
+            request.result = {
+                "success": False,
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+            }
+            if FREECAD_AVAILABLE:
+                FreeCAD.Console.PrintError(f"Queue processing error: {e}\n")
+        finally:
+            request.completed.set()
+            self._record_request()
 
     def _process_queue(self) -> None:
-        """Process pending execution requests on the main thread.
+        """Process all pending execution requests on the main thread.
 
-        This method is called periodically by a Qt timer to ensure
-        GUI operations happen on the main thread.
+        This is invoked by the GUI wake-up event (immediately after a request
+        is enqueued) and by the safety-net timer. It drains everything
+        currently queued so a burst of requests is handled in one pass.
         """
-        while not self._request_queue.empty():
+        while True:
             try:
                 request = self._request_queue.get_nowait()
-                result = self._execute_code_sync(request.code)
-                request.result = result
-                request.completed.set()
-                # Track request for status bar
-                self._record_request()
             except queue.Empty:
                 break
-            except Exception as e:
-                if FREECAD_AVAILABLE:
-                    FreeCAD.Console.PrintError(f"Queue processing error: {e}\n")
+            self._run_request(request)
 
     def _execute_via_queue(
         self,
@@ -741,6 +830,13 @@ class FreecadMCPPlugin:
         """
         request = ExecutionRequest(code, timeout_ms)
         self._request_queue.put(request)
+
+        # Wake the GUI main thread now so the request is processed immediately
+        # rather than on the next safety-net timer tick. In headless mode the
+        # blocking queue.get() already wakes on its own, so no notifier exists.
+        if self._notifier is not None:
+            with contextlib.suppress(Exception):
+                self._notifier.wake()
 
         # Wait for completion
         if request.completed.wait(timeout=timeout_ms / 1000):
@@ -963,6 +1059,12 @@ class FreecadMCPPlugin:
         class QuietXMLRPCRequestHandler(xmlrpc.server.SimpleXMLRPCRequestHandler):
             """XML-RPC handler that responds gracefully to GET requests."""
 
+            # Keep the TCP connection open between calls (HTTP/1.1 keep-alive).
+            # The client makes one XML-RPC call per tool invocation; without
+            # this every call pays a fresh TCP three-way handshake. With it,
+            # a whole modeling session reuses a single socket.
+            protocol_version = "HTTP/1.1"
+
             def do_GET(self) -> None:
                 """Handle GET requests with a friendly plain-text response.
 
@@ -1019,8 +1121,18 @@ class FreecadMCPPlugin:
                 """
                 pass
 
+        # A threaded server so a long-lived keep-alive connection (or a slow
+        # execute) on one client socket cannot block ping/health-check calls
+        # arriving on another. GUI thread-safety is unaffected: all code still
+        # runs through the single main-thread queue; only the HTTP transport
+        # layer is concurrent.
+        class _ThreadingXMLRPCServer(
+            socketserver.ThreadingMixIn, xmlrpc.server.SimpleXMLRPCServer
+        ):
+            daemon_threads = True
+
         try:
-            self._xmlrpc_server = xmlrpc.server.SimpleXMLRPCServer(
+            self._xmlrpc_server = _ThreadingXMLRPCServer(
                 (self._host, self._xmlrpc_port),
                 requestHandler=QuietXMLRPCRequestHandler,
                 allow_none=True,
