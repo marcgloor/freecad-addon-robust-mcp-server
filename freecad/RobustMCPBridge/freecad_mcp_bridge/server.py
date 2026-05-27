@@ -144,6 +144,7 @@ STATUS_UPDATE_INTERVAL_MS = 5000  # Update status bar every 5 seconds
 # Headless mode blocks on the queue with this timeout instead of busy-polling,
 # so it wakes the instant a request arrives while still checking _running.
 HEADLESS_POLL_INTERVAL_S = 0.25
+MAX_QUEUE_DRAIN_PER_PASS = 100
 
 
 def _get_qt_core() -> Any:
@@ -827,18 +828,24 @@ class FreecadMCPPlugin:
             self._record_request()
 
     def _process_queue(self) -> None:
-        """Process all pending execution requests on the main thread.
+        """Process pending execution requests on the main thread.
 
-        This is invoked by the GUI wake-up event (immediately after a request
-        is enqueued) and by the safety-net timer. It drains everything
-        currently queued so a burst of requests is handled in one pass.
+        Uses adaptive bounded draining in GUI mode to preserve responsiveness
+        during very large bursts while still draining aggressively.
         """
-        while True:
+        processed = 0
+        while processed < MAX_QUEUE_DRAIN_PER_PASS:
             try:
                 request = self._request_queue.get_nowait()
             except queue.Empty:
                 break
             self._run_request(request)
+            processed += 1
+
+        # If we hit the cap and more work remains, re-schedule an immediate wake.
+        if self._notifier is not None and not self._request_queue.empty():
+            with contextlib.suppress(Exception):
+                self._notifier.wake()
 
     def _execute_via_queue(
         self,

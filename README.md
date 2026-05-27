@@ -721,3 +721,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 - Phase 2 / Item 5: Added execution `capture_mode` (`full|none|stdout|stderr`) to reduce unnecessary stdout/stderr capture overhead on socket RPC paths.
 - Phase 2 / Item 6: Added XML-RPC status TTL cache (10s) for stable metadata to avoid repeated version/GUI probes in tight polling loops.
 - Phase 3 / Item 7: Added optional `orjson` fast-path serialization for socket client/server with stdlib JSON fallback.
+- Phase 3 / Item 8: Added adaptive bounded queue draining (`MAX_QUEUE_DRAIN_PER_PASS=100`) to improve GUI responsiveness during request bursts.
