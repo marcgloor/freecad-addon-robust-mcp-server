@@ -11,10 +11,27 @@ Based on learnings from competitive analysis:
 
 import asyncio
 import contextlib
-import json
 import time
 import uuid
 from typing import Any
+
+try:
+    import orjson as _json_backend
+
+    def _json_dumps(obj: Any) -> bytes:
+        return _json_backend.dumps(obj)
+
+    def _json_loads(data: bytes) -> Any:
+        return _json_backend.loads(data)
+
+except Exception:  # pragma: no cover
+    import json as _json_backend
+
+    def _json_dumps(obj: Any) -> bytes:
+        return _json_backend.dumps(obj).encode("utf-8")
+
+    def _json_loads(data: bytes) -> Any:
+        return _json_backend.loads(data.decode("utf-8"))
 
 from freecad_mcp.bridge.base import (
     ConnectionStatus,
@@ -166,7 +183,7 @@ class SocketBridge(FreecadBridge):
         async with self._lock:
             try:
                 # Send request
-                request_data = json.dumps(request).encode("utf-8") + b"\n"
+                request_data = _json_dumps(request) + b"\n"
                 self._writer.write(request_data)
                 await self._writer.drain()
 
@@ -181,7 +198,7 @@ class SocketBridge(FreecadBridge):
                     msg = "Connection closed by server"
                     raise ConnectionError(msg)
 
-                response = json.loads(response_data.decode("utf-8"))
+                response = _json_loads(response_data)
 
                 # Check for error
                 if "error" in response:
@@ -197,7 +214,7 @@ class SocketBridge(FreecadBridge):
             except TimeoutError as e:
                 msg = "Request timed out"
                 raise ConnectionError(msg) from e
-            except json.JSONDecodeError as e:
+            except Exception as e:
                 msg = f"Invalid JSON response: {e}"
                 raise ConnectionError(msg) from e
             except (ConnectionResetError, BrokenPipeError) as e:

@@ -22,7 +22,6 @@ import atexit
 import contextlib
 import errno
 import io
-import json
 import os
 import queue
 import sys
@@ -36,6 +35,24 @@ from functools import lru_cache
 import xmlrpc.server
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
+
+try:
+    import orjson as _json_backend
+
+    def _json_dumps(obj: Any) -> bytes:
+        return _json_backend.dumps(obj)
+
+    def _json_loads(data: bytes) -> Any:
+        return _json_backend.loads(data)
+
+except Exception:  # pragma: no cover
+    import json as _json_backend
+
+    def _json_dumps(obj: Any) -> bytes:
+        return _json_backend.dumps(obj).encode("utf-8")
+
+    def _json_loads(data: bytes) -> Any:
+        return _json_backend.loads(data.decode("utf-8"))
 
 # Global registry of active servers for cleanup on Python exit
 # Uses weak references to avoid preventing garbage collection
@@ -1007,9 +1024,9 @@ class FreecadMCPPlugin:
                     break
 
                 try:
-                    request = json.loads(data.decode("utf-8"))
+                    request = _json_loads(data)
                     response = await self._process_jsonrpc_request(request)
-                except json.JSONDecodeError as e:
+                except Exception as e:
                     response = {
                         "jsonrpc": "2.0",
                         "id": None,
@@ -1020,7 +1037,7 @@ class FreecadMCPPlugin:
                         },
                     }
 
-                response_data = json.dumps(response).encode("utf-8") + b"\n"
+                response_data = _json_dumps(response) + b"\n"
                 writer.write(response_data)
                 await writer.drain()
 
