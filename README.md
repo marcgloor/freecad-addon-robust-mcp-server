@@ -741,3 +741,4 @@ Key takeaway: disabling output capture (`capture_mode=none`) is ~2.5x faster tha
 
 ## Performance Tips
 - For lowest latency command execution, use `execute_python(..., capture_mode="none")` when logs are not needed.
+- Use `execute_python_batch(items=...)` to bundle multiple snippets into one bridge round trip.

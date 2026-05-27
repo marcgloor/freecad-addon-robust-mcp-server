@@ -83,6 +83,79 @@ def register_execution_tools(
         }
 
     @mcp.tool()
+    async def execute_python_batch(
+        items: list[dict[str, Any]],
+        timeout_ms: int = 30000,
+    ) -> dict[str, Any]:
+        """Execute multiple Python snippets in one bridge call when supported.
+
+        Args:
+            items: List of dicts with keys:
+                - code (required): Python snippet to execute
+                - timeout_ms (optional): per-item timeout override
+                - capture_mode (optional): "full", "stdout", "stderr", "none"
+            timeout_ms: Default timeout in milliseconds for each item.
+
+        Returns:
+            Dictionary with:
+                - count: Number of executed snippets
+                - results: Per-item execution results in input order
+        """
+        bridge = await get_bridge()
+
+        normalized_items: list[dict[str, Any]] = []
+        for item in items:
+            if "code" not in item:
+                raise ValueError("Each batch item must include 'code'")
+            normalized_items.append(
+                {
+                    "code": str(item["code"]),
+                    "timeout_ms": int(item.get("timeout_ms", timeout_ms)),
+                    "capture_mode": str(item.get("capture_mode", "none")),
+                }
+            )
+
+        if hasattr(bridge, "batch_execute"):
+            raw_results = await bridge.batch_execute(normalized_items, timeout_ms)
+            results: list[dict[str, Any]] = []
+            for result in raw_results:
+                if hasattr(result, "success"):
+                    results.append(
+                        {
+                            "success": result.success,
+                            "result": result.result,
+                            "stdout": result.stdout,
+                            "stderr": result.stderr,
+                            "execution_time_ms": result.execution_time_ms,
+                            "error_type": result.error_type,
+                            "error_traceback": result.error_traceback,
+                        }
+                    )
+                else:
+                    results.append(result)
+            return {"count": len(results), "results": results}
+
+        # Fallback for bridges without native batch support
+        results = []
+        for item in normalized_items:
+            res = await bridge.execute_python(
+                item["code"], item["timeout_ms"], item["capture_mode"]
+            )
+            results.append(
+                {
+                    "success": res.success,
+                    "result": res.result,
+                    "stdout": res.stdout,
+                    "stderr": res.stderr,
+                    "execution_time_ms": res.execution_time_ms,
+                    "error_type": res.error_type,
+                    "error_traceback": res.error_traceback,
+                }
+            )
+
+        return {"count": len(results), "results": results}
+
+    @mcp.tool()
     async def get_freecad_version() -> dict[str, Any]:
         """Get FreeCAD version and build information.
 
